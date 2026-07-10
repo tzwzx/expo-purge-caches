@@ -1,12 +1,35 @@
 {
   "name": "expo-purge-caches",
   "version": "1.0.0",
-  "description": "Purge all Expo/React Native build caches for a clean rebuild",
+  "description": "Purge Expo/React Native build caches for a clean rebuild",
   "bin": {
     "expo-purge-caches": "./bin/purge-build-caches.sh"
   },
   "files": [
     "bin"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tzwzx/expo-purge-caches.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tzwzx/expo-purge-caches/issues"
+  },
+  "homepage": "https://github.com/tzwzx/expo-purge-caches#readme",
+  "keywords": [
+    "expo",
+    "react-native",
+    "cache",
+    "clean",
+    "purge",
+    "metro",
+    "xcode",
+    "cli"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "author": "Naoto Tazawa",
   "license": "MIT"
 }

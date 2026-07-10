@@ -1,6 +1,6 @@
 # expo-purge-caches
 
-**A CLI tool that wipes all Expo / React Native build caches so you can rebuild from a clean slate.** 🧹
+**A CLI tool that wipes Expo / React Native build caches so you can rebuild from a clean slate.** 🧹
 
 "Dependencies were updated but the change isn't picked up", "`Unable to resolve module` won't go away even after clearing caches", "Xcode fails to build because of stale artifacts" — when you hit one of these cache-related dead ends, this tool blows away the relevant caches in one shot so you can rebuild everything from scratch.
 
@@ -10,16 +10,21 @@ Under the hood it's a single shell script, [bin/purge-build-caches.sh](bin/purge
 
 ## ✨ What does it do?
 
-Running `expo-purge-caches` deletes the following **in order**:
+By default, `expo-purge-caches` only touches things that are **safe to delete and scoped to your project** (plus the per-user Metro / Watchman state that belongs to it):
 
-1. Local build artifacts in your project (`ios` / `android` / `.expo` / `node_modules/.cache`)
-2. Metro bundler caches (under `/tmp`)
-3. Xcode caches (DerivedData, etc.)
-4. iOS Simulator caches
-5. Watchman watch caches
-6. CocoaPods caches
+1. Local build artifacts in your project (`ios` / `android` / `.expo` / `.gradle` / `node_modules/.cache`) — with [safety checks](#-safety-checks) for `ios` / `android`
+2. Metro bundler caches (`$TMPDIR/metro-*`, `$TMPDIR/haste-map-*`, `$TMPDIR/metro-file-map-*`)
+3. Watchman watches (`watchman watch-del-all`)
 
-In other words, it clears caches at both the **local project** level and the **machine-wide (home directory)** level. Because the targets include **caches shared across your whole machine**, please read the "⚠️ Caveats" section below before running it.
+With the **`--deep`** flag it additionally purges **machine-wide caches shared across all your projects** (after a confirmation prompt):
+
+4. Xcode caches (`~/Library/Developer/Xcode/DerivedData`, `~/Library/Caches/com.apple.dt.Xcode`)
+5. iOS Simulator caches (`~/Library/Developer/CoreSimulator/Caches`)
+6. CocoaPods cache (`pod cache clean --all`, `~/Library/Caches/CocoaPods`)
+7. Swift Package Manager cache (`~/Library/Caches/org.swift.swiftpm`)
+8. Gradle cache (`~/.gradle/caches`)
+
+Deleting the machine-wide caches breaks nothing, but the next build of **other** projects will be slower while the caches regenerate — that's why they are opt-in.
 
 ---
 
@@ -27,11 +32,11 @@ In other words, it clears caches at both the **local project** level and the **m
 
 | Item | Details |
 | --- | --- |
-| OS | **macOS expected** (it operates on Xcode / iOS Simulator / CocoaPods caches) |
-| Required | Node.js (used to run via `npx`) |
-| Optional | Xcode / `xcrun simctl`, Watchman, CocoaPods (related steps are skipped when not installed) |
+| OS | **macOS or Linux** (the Xcode / Simulator / CocoaPods steps only apply on macOS and are skipped elsewhere) |
+| Required | Node.js (used to run via `npx`), Bash |
+| Optional | Watchman, CocoaPods (related steps are skipped when not installed) |
 
-> 📝 The Watchman and CocoaPods steps are swallowed so they won't error out when those tools aren't installed (see below). The `xcrun simctl` step, however, assumes a macOS / Xcode environment.
+> 📝 Windows is not supported (the package declares `"os": ["darwin", "linux"]`).
 
 ---
 
@@ -40,10 +45,27 @@ In other words, it clears caches at both the **local project** level and the **m
 ### Run directly with npx (no install required)
 
 ```bash
+# safe, project-scoped purge
 npx expo-purge-caches
+
+# also purge machine-wide caches (Xcode, Simulator, CocoaPods, Gradle, SwiftPM)
+npx expo-purge-caches --deep
+
+# preview what would be deleted, without deleting anything
+npx expo-purge-caches --deep --dry-run
 ```
 
-> ⚠️ This command treats the **current directory** as the root of your Expo / React Native project and deletes `ios` / `android` / `.expo` and friends there. **Always run it from the root of the target project.**
+> ⚠️ Run it from the **root of your Expo / React Native project**. The command refuses to run if the current directory doesn't contain a `package.json` with an `expo` or `react-native` dependency, so accidentally running it elsewhere is harmless.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--deep` | Also purge machine-wide caches shared across all projects (asks for confirmation) |
+| `--dry-run` | Print everything that would be deleted, delete nothing |
+| `-y`, `--yes` | Skip confirmation prompts (for CI / npm scripts) |
+| `--version` | Print the version |
+| `-h`, `--help` | Show help |
 
 ### Install globally
 
@@ -61,7 +83,8 @@ Registering it in `package.json` makes it easy to share across a team.
 ```jsonc
 {
   "scripts": {
-    "clean": "expo-purge-caches"
+    "clean": "expo-purge-caches",
+    "clean:deep": "expo-purge-caches --deep --yes"
   }
 }
 ```
@@ -72,110 +95,93 @@ npm run clean
 
 ---
 
-## 🧹 What gets deleted (in detail)
+## 🛟 Safety checks
 
-Here is exactly what the script does, broken down by category.
+The script is deliberately paranoid before deleting anything:
+
+- **Project validation** — it refuses to run unless the current directory contains a `package.json` that declares an `expo` or `react-native` dependency. Running it in the wrong directory does nothing.
+- **`ios` / `android` protection** — these directories are only deleted when they are **not tracked by git** (i.e. they are generated artifacts, as in [Continuous Native Generation](https://docs.expo.dev/workflow/continuous-native-generation/)). If they are tracked — which usually means hand-written native code — they are **skipped with a warning** instead of deleted. If the project isn't a git repo at all, you are asked to confirm.
+- **Machine-wide caches are opt-in** — nothing outside your project (except Metro temp files and Watchman watches) is touched unless you pass `--deep`, and `--deep` asks for confirmation first.
+- **`--dry-run`** — preview every path that would be removed.
+- **Missing tools never break it** — Watchman / CocoaPods steps are skipped when the tools aren't installed.
+
+---
+
+## 🧹 What gets deleted (in detail)
 
 ### 1. Local build artifacts (inside the project)
 
-```bash
-rm -rf ios android .expo node_modules/.cache
-```
-
 | Target | What it is | Why it's removed |
 | --- | --- | --- |
-| `ios` / `android` | Native project directories | Reset stale native build config / output. Assumes they can be regenerated with `expo prebuild` |
+| `ios` / `android` | Native project directories | Reset stale native build config / output. Only deleted when untracked by git (regenerable with `npx expo prebuild`) |
 | `.expo` | Expo's local cache / temp config | Remove stale dev-server-related caches |
+| `.gradle` | Project-level Gradle cache | Remove stale Gradle configuration state |
 | `node_modules/.cache` | Cache directory for various tools | Remove caches left by Babel / Metro, etc. (the full `node_modules` is **not** deleted) |
 
-### 2. Metro bundler caches (under `/tmp`)
+### 2. Metro bundler caches
 
 ```bash
-rm -rf /tmp/metro-* /tmp/haste-map-* /tmp/react-native-*
+rm -rf "$TMPDIR"/metro-* "$TMPDIR"/haste-map-* "$TMPDIR"/metro-file-map-*
 ```
+
+Metro writes its caches to the OS temp directory reported by Node.js (`os.tmpdir()`), which on macOS is `$TMPDIR` (somewhere under `/var/folders/...`), **not** `/tmp`. This matches the [official Expo cache-clearing guide](https://docs.expo.dev/troubleshooting/clear-cache-macos-linux/).
 
 | Target | What it is |
 | --- | --- |
-| `/tmp/metro-*` | Caches generated by the Metro bundler |
-| `/tmp/haste-map-*` | Haste module map caches |
-| `/tmp/react-native-*` | React Native temporary files |
+| `$TMPDIR/metro-*` | Metro transformer cache (`metro-cache`) and friends |
+| `$TMPDIR/haste-map-*` | File map caches (older Metro versions) |
+| `$TMPDIR/metro-file-map-*` | File map caches (newer Metro versions) |
 
-### 3. Xcode caches (under home — machine-wide)
+### 3. Watchman
 
 ```bash
-rm -rf ~/Library/Developer/Xcode/DerivedData
-rm -rf ~/Library/Developer/Xcode/Products
-rm -rf ~/Library/Caches/com.apple.dt.Xcode
+watchman watch-del-all
 ```
+
+Cancels all watches and resets Watchman's file-watching state. Skipped when Watchman isn't installed.
+
+### 4. Machine-wide caches (`--deep` only)
 
 | Target | What it is |
 | --- | --- |
 | `~/Library/Developer/Xcode/DerivedData` | Xcode's intermediate build output / indexes |
-| `~/Library/Developer/Xcode/Products` | Built products |
 | `~/Library/Caches/com.apple.dt.Xcode` | Cache for the Xcode app itself |
-
-### 4. iOS Simulator caches
-
-```bash
-rm -rf ~/Library/Developer/CoreSimulator/Caches
-xcrun simctl delete unavailable
-```
-
-| Target | What it is |
-| --- | --- |
-| `~/Library/Developer/CoreSimulator/Caches` | Simulator caches |
-| `xcrun simctl delete unavailable` | Deletes simulators that became unavailable (e.g. for old OS versions) |
-
-### 5. Watchman watch caches
-
-```bash
-watchman watch-del-all 2>/dev/null || true
-```
-
-Cancels all watches and resets Watchman's cache. **It continues without erroring even if Watchman isn't installed** (`|| true`).
-
-### 6. CocoaPods caches
-
-```bash
-pod cache clean --all 2>/dev/null || true
-```
-
-Deletes all downloaded Pod caches. **It continues without erroring even if CocoaPods isn't installed** (`|| true`).
+| `~/Library/Developer/CoreSimulator/Caches` | iOS Simulator caches |
+| `pod cache clean --all` + `~/Library/Caches/CocoaPods` | Downloaded Pod caches |
+| `~/Library/Caches/org.swift.swiftpm` | Swift Package Manager downloads |
+| `~/.gradle/caches` | Gradle's global dependency / build cache |
 
 ---
 
 ## 🖥 Example output
 
-When you run it, the progress of each step is printed.
-
 ```text
+$ npx expo-purge-caches
 Purging build caches...
 Removing local build artifacts...
+  removing: ios
+  removing: android
+  removing: .expo
+  removing: node_modules/.cache
 Removing Metro cache...
-Removing Xcode caches...
-Removing simulator caches...
-Resetting Watchman cache...
-Removing CocoaPods cache...
+  removing: /var/folders/xx/.../T/metro-cache
+Resetting Watchman watches...
+  running: watchman watch-del-all
 Done.
 ```
-
-Because `set -e` is enabled at the top of the script, it **aborts the moment a non-swallowed step fails** (if it stops partway through, the message printed just before is a clue to the cause).
 
 ---
 
 ## ⚠️ Caveats (read before running)
 
-- **The `ios` / `android` directories are deleted.**
-  This behavior assumes they can be regenerated with `npx expo prebuild` (Continuous Native Generation / the managed workflow). **If you hand-edit native code (the bare workflow), those changes will be lost.** When in doubt, commit / back up before running.
+- **The `ios` / `android` directories are deleted when untracked by git.**
+  This assumes they can be regenerated with `npx expo prebuild` (Continuous Native Generation). Directories tracked by git are skipped automatically, but if you keep hand-written native code untracked for some reason, commit or back it up first.
 
-- **Machine-wide shared caches are deleted too.**
-  Xcode's `DerivedData`, the Simulator caches, and the CocoaPods cache are **global caches under your home directory**. They affect projects beyond this one, so **other projects' next builds may be slower or trigger dependency re-downloads** (nothing breaks — it just takes time to regenerate).
+- **`--deep` affects other projects.**
+  Xcode's DerivedData, the Simulator caches, and the CocoaPods / Gradle / SwiftPM caches are global. Other projects' next builds will be slower or re-download dependencies (nothing breaks — it just takes time to regenerate).
 
 - **It operates on the current directory.**
-  `rm -rf ios android ...` runs against relative paths. **Always run it from the root of the target project.** Running it elsewhere may delete unintended directories.
-
-- **macOS / iOS development is assumed.**
-  It includes steps that touch Xcode, `xcrun simctl`, and CocoaPods. The Watchman and CocoaPods steps are skipped when not installed, but overall the tool is meant for use on macOS.
+  Always run it from the root of the target project. The built-in project validation refuses to run anywhere that doesn't look like an Expo / React Native project.
 
 ---
 
@@ -187,16 +193,13 @@ After clearing caches, recreate your dependencies and native projects before bui
 # 1. Reinstall dependencies
 npm install            # or yarn / bun install
 
-# 2. Regenerate native projects (for the managed workflow)
+# 2. Regenerate native projects (for Continuous Native Generation)
 npx expo prebuild --clean
 
-# 3. Reinstall iOS Pods (prebuild may do this automatically)
-cd ios && pod install && cd ..
-
-# 4. Start the dev server with cache clearing
+# 3. Start the dev server with cache clearing
 npx expo start --clear
 
-# 5. Build natively and run
+# 4. Build natively and run
 npx expo run:ios
 npx expo run:android
 ```
@@ -214,4 +217,4 @@ npx expo run:android
 
 ## 📄 License
 
-[MIT](package.json)
+[MIT](LICENSE)
