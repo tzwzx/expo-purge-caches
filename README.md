@@ -13,7 +13,7 @@ Under the hood it's a single shell script, [bin/purge-build-caches.sh](bin/purge
 By default, `expo-purge-caches` only touches things that are **safe to delete and scoped to your project** (plus the per-user Metro / Watchman state that belongs to it):
 
 1. Local build artifacts in your project (`ios` / `android` / `.expo` / `.gradle` / `node_modules/.cache`) — with [safety checks](#-safety-checks) for `ios` / `android`
-2. Metro bundler caches (`$TMPDIR/metro-*`, `$TMPDIR/haste-map-*`, `$TMPDIR/metro-file-map-*`)
+2. Metro bundler caches (`$TMPDIR/metro-*`, `$TMPDIR/haste-map-*`)
 3. Watchman watches (`watchman watch-del-all`)
 
 With the **`--deep`** flag it additionally purges **machine-wide caches shared across all your projects** (after a confirmation prompt):
@@ -121,16 +121,15 @@ The script is deliberately paranoid before deleting anything:
 ### 2. Metro bundler caches
 
 ```bash
-rm -rf "$TMPDIR"/metro-* "$TMPDIR"/haste-map-* "$TMPDIR"/metro-file-map-*
+rm -rf "$TMPDIR"/metro-* "$TMPDIR"/haste-map-*
 ```
 
 Metro writes its caches to the OS temp directory reported by Node.js (`os.tmpdir()`), which on macOS is `$TMPDIR` (somewhere under `/var/folders/...`), **not** `/tmp`. This matches the [official Expo cache-clearing guide](https://docs.expo.dev/troubleshooting/clear-cache-macos-linux/).
 
 | Target | What it is |
 | --- | --- |
-| `$TMPDIR/metro-*` | Metro transformer cache (`metro-cache`) and friends |
+| `$TMPDIR/metro-*` | Metro transformer cache (`metro-cache`), file map caches of newer Metro versions (`metro-file-map-*`), and friends |
 | `$TMPDIR/haste-map-*` | File map caches (older Metro versions) |
-| `$TMPDIR/metro-file-map-*` | File map caches (newer Metro versions) |
 
 ### 3. Watchman
 

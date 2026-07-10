@@ -151,11 +151,12 @@ remove .expo .gradle node_modules/.cache
 # ---- 2. Metro bundler caches ------------------------------------------------
 
 # Metro writes its caches to Node.js os.tmpdir() ($TMPDIR on macOS), NOT /tmp.
-# haste-map-* is the file map cache of older Metro versions, metro-file-map-* of newer ones
+# metro-* covers metro-cache and the newer metro-file-map-* file map caches;
+# haste-map-* is the file map cache of older Metro versions
 echo "Removing Metro cache..."
 TMP_DIR="${TMPDIR:-/tmp}"
 TMP_DIR="${TMP_DIR%/}"
-remove "$TMP_DIR"/metro-* "$TMP_DIR"/haste-map-* "$TMP_DIR"/metro-file-map-*
+remove "$TMP_DIR"/metro-* "$TMP_DIR"/haste-map-*
 
 # ---- 3. Watchman -------------------------------------------------------------
 
