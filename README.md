@@ -157,16 +157,16 @@ Cancels all watches and resets Watchman's file-watching state. Skipped when Watc
 ```text
 $ npx expo-purge-caches
 Purging build caches...
-Removing local build artifacts...
-  removing: ios
-  removing: android
-  removing: .expo
-  removing: node_modules/.cache
-Removing Metro cache...
-  removing: /var/folders/xx/.../T/metro-cache
-Resetting Watchman watches...
-  running: watchman watch-del-all
-Done.
+▸ Removing local build artifacts...
+  ✓ removed: ios
+  ✓ removed: android
+  ✓ removed: .expo
+  ✓ removed: node_modules/.cache
+▸ Removing Metro cache...
+  ✓ removed: /var/folders/xx/.../T/metro-cache
+▸ Resetting Watchman watches...
+  ▹ running: watchman watch-del-all
+✔ Done.
 ```
 
 ---

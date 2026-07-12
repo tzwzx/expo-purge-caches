@@ -100,8 +100,8 @@ remove() {
     if $DRY_RUN; then
       echo "  ${CYAN}[dry-run]${RESET} would remove: ${DIM}$path${RESET}"
     else
-      echo "  ${RED}✗${RESET} removing: ${DIM}$path${RESET}"
       rm -rf "$path"
+      echo "  ${GREEN}✓${RESET} removed: ${DIM}$path${RESET}"
     fi
   done
 }
