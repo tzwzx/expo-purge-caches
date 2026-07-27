@@ -1,5 +1,7 @@
 # expo-purge-caches
 
+English | [日本語](https://github.com/tzwzx/expo-purge-caches/blob/main/README.ja.md)
+
 **A CLI tool that wipes Expo / React Native build caches so you can rebuild from a clean slate.** 🧹
 
 "Dependencies were updated but the change isn't picked up", "`Unable to resolve module` won't go away even after clearing caches", "Xcode fails to build because of stale artifacts" — when you hit one of these cache-related dead ends, this tool blows away the relevant caches in one shot so you can rebuild everything from scratch.
