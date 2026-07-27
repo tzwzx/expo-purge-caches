@@ -72,7 +72,7 @@ npx expo-purge-caches --deep --dry-run
 ### Install globally
 
 ```bash
-npm install -g expo-purge-caches
+npm install -g @tzwzx/expo-purge-caches
 
 # afterwards you can run it from anywhere by name
 expo-purge-caches

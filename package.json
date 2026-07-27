@@ -1,5 +1,5 @@
 {
-  "name": "expo-purge-caches",
+  "name": "@tzwzx/expo-purge-caches",
   "version": "1.0.0",
   "description": "Purge Expo/React Native build caches for a clean rebuild",
   "bin": {
