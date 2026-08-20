@@ -32,7 +32,7 @@ Expo アプリ群で共有する、**ビルドキャッシュ一括削除スク�
 
 ## 仕様
 
-### 既定（引数なし）— プロジェクトに閉じた削除
+### 既定（引数なし）— プロジェクトローカル + TMPDIR の再生成可能なキャッシュ
 
 | 対象 | 中身 |
 | --- | --- |
@@ -41,6 +41,7 @@ Expo アプリ群で共有する、**ビルドキャッシュ一括削除スク�
 | `.gradle` | プロジェクト単位の Gradle キャッシュ |
 | `node_modules/.cache` | Babel / Metro 等が残すキャッシュ（`node_modules` 全体は消さない） |
 | `$TMPDIR/metro-*`, `$TMPDIR/haste-map-*` | Metro のキャッシュ。**`/tmp` ではなく `os.tmpdir()`**（macOS では `/var/folders/...`）に置かれる |
+| `$TMPDIR/bunx-[0-9]*` | bunx の一時展開（`bunx-<uid>-<pkg>@<ver>`）。中身が空でも `bun.lock` が残っていると再インストールしないため、Metro と同じ TMPDIR 掃除でまとめて消す。`~/.bun/install/cache` は触らない |
 | `watchman watch-del-all` | Watchman の監視状態をリセット（未インストールならスキップ） |
 
 ### `--deep` — マシン全体の共有キャッシュも削除
@@ -80,6 +81,8 @@ Xcode / Simulator / CocoaPods 関連は macOS 以外ではスキップされる�
 ## 変更したときの確認
 
 ```bash
+bash tests/purge.test.sh
+
 # 消す対象だけを確認する（実際には消さない）
 bash bin/purge-build-caches.sh --deep --dry-run
 

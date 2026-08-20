@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CLI that safely purges Expo / React Native build caches
 #
-# Default: project-local caches + Metro + Watchman only (safe scope that never affects other projects)
+# Default: project-local caches + Metro/bunx temp caches + Watchman
 # --deep : also purges machine-wide shared caches (Xcode / Simulator / CocoaPods / Gradle / SwiftPM)
 #
 # Note: must stay compatible with the bash 3.2 that ships with macOS
@@ -10,7 +10,7 @@
 set -euo pipefail
 shopt -s nullglob
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 DEEP=false
 DRY_RUN=false
@@ -53,8 +53,8 @@ ${BOLD}Usage:${RESET} expo-purge-caches [options]
 
 Run from the root of your Expo / React Native project.
 
-By default only project-local caches, Metro caches, and Watchman watches are
-purged. Machine-wide caches are only touched with --deep.
+By default only project-local caches, Metro/bunx temp caches, and Watchman
+watches are purged. Machine-wide caches are only touched with --deep.
 
 ${BOLD}Options:${RESET}
   --deep       Also purge machine-wide caches shared across all projects
@@ -175,15 +175,16 @@ purge_native_dir ios
 purge_native_dir android
 remove .expo .gradle node_modules/.cache
 
-# ---- 2. Metro bundler caches ------------------------------------------------
+# ---- 2. TMPDIR caches (Metro + bunx) ----------------------------------------
 
-# Metro writes its caches to Node.js os.tmpdir() ($TMPDIR on macOS), NOT /tmp.
-# metro-* covers metro-cache and the newer metro-file-map-* file map caches;
-# haste-map-* is the file map cache of older Metro versions
-section "Removing Metro cache..."
+# Metro も bunx も Node の os.tmpdir()（macOS では $TMPDIR）に置く。/tmp ではない。
+# metro-* は metro-cache と新しい metro-file-map-*、haste-map-* は旧 Metro の file map。
+# bunx-<uid>-<pkg>@<ver> は bunx の展開先。macOS が /var/folders のファイルだけ掃除すると
+# bun.lock 付きの空ディレクトリが残り、次回 bunx は再インストールせず MODULE_NOT_FOUND になる。
+section "Removing Metro and bunx temp caches..."
 TMP_DIR="${TMPDIR:-/tmp}"
 TMP_DIR="${TMP_DIR%/}"
-remove "$TMP_DIR"/metro-* "$TMP_DIR"/haste-map-*
+remove "$TMP_DIR"/metro-* "$TMP_DIR"/haste-map-* "$TMP_DIR"/bunx-[0-9]*
 
 # ---- 3. Watchman -------------------------------------------------------------
 

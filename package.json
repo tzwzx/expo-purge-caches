@@ -1,9 +1,12 @@
 {
   "name": "@tzwzx/expo-purge-caches",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Purge Expo/React Native build caches for a clean rebuild",
   "bin": {
     "expo-purge-caches": "./bin/purge-build-caches.sh"
+  },
+  "scripts": {
+    "test": "bash tests/purge.test.sh"
   },
   "files": [
     "bin"
