@@ -16,8 +16,6 @@ DEEP=false
 DRY_RUN=false
 ASSUME_YES=false
 
-# ---- Colors ------------------------------------------------------------------
-
 # Colorize only when stdout is a terminal; respect NO_COLOR (https://no-color.org)
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
   BOLD=$'\033[1m'
@@ -143,10 +141,8 @@ purge_native_dir() {
   fi
 }
 
-# ---- Pre-flight checks -----------------------------------------------------
-
-# Verify the current directory is the root of an Expo / React Native project,
-# to prevent running in the wrong place (e.g. deleting an unrelated project's ios/)
+# Refuse to run outside an Expo / React Native project root so we do not
+# delete another directory's ios/.
 if [ ! -f package.json ]; then
   die "package.json not found in the current directory." \
       "Run this command from the root of your Expo / React Native project."
@@ -168,30 +164,23 @@ fi
 
 echo "${BOLD}Purging build caches...${RESET}"
 
-# ---- 1. Project-local build artifacts and caches ---------------------------
-
 section "Removing local build artifacts..."
 purge_native_dir ios
 purge_native_dir android
 remove .expo .gradle node_modules/.cache
 
-# ---- 2. TMPDIR caches (Metro + bunx) ----------------------------------------
-
-# Metro も bunx も Node の os.tmpdir()（macOS では $TMPDIR）に置く。/tmp ではない。
-# metro-* は metro-cache と新しい metro-file-map-*、haste-map-* は旧 Metro の file map。
-# bunx-<uid>-<pkg>@<ver> は bunx の展開先。macOS が /var/folders のファイルだけ掃除すると
-# bun.lock 付きの空ディレクトリが残り、次回 bunx は再インストールせず MODULE_NOT_FOUND になる。
+# Metro and bunx use Node's os.tmpdir() ($TMPDIR on macOS), not /tmp.
+# metro-* covers metro-cache and metro-file-map-*; haste-map-* is the old file map.
+# bunx-<uid>-<pkg>@<ver> is bunx's extract dir. If macOS cleans files under
+# /var/folders and leaves an empty dir with bun.lock, the next bunx skips
+# reinstall and hits MODULE_NOT_FOUND.
 section "Removing Metro and bunx temp caches..."
 TMP_DIR="${TMPDIR:-/tmp}"
 TMP_DIR="${TMP_DIR%/}"
 remove "$TMP_DIR"/metro-* "$TMP_DIR"/haste-map-* "$TMP_DIR"/bunx-[0-9]*
 
-# ---- 3. Watchman -------------------------------------------------------------
-
 section "Resetting Watchman watches..."
 run_cmd watchman watch-del-all
-
-# ---- 4. Machine-wide shared caches (--deep only) ----------------------------
 
 if $DEEP; then
   section "Removing Xcode caches..."

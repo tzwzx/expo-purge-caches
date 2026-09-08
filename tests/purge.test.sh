@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# expo-purge-caches の TMPDIR 削除対象を検証する
+# Verify which TMPDIR entries expo-purge-caches removes.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$ROOT/bin/purge-build-caches.sh"
-# Watchman を動かさない（実マシンの watch を消さない）
+# Keep Watchman off PATH so tests do not drop watches on this machine.
 SAFE_PATH="/usr/bin:/bin"
 
 fail() {
@@ -26,7 +26,7 @@ setup_project() {
   printf '{"dependencies":{"expo":"1.0.0"}}\n' >"$workdir/package.json"
 }
 
-# bun.lock が残った空の bunx 展開は、次回 bunx が再インストールせず壊れたままになる
+# An empty bunx extract that still has bun.lock will not be reinstalled next time.
 test_removes_zombie_bunx_cache() {
   local workdir fake_tmp
   workdir="$(mktemp -d "${TMPDIR:-/tmp}/expo-purge-test-proj.XXXXXX")"
