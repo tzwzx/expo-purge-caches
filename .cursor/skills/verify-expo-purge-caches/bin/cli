@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Drive expo-purge-caches in a disposable project with an isolated TMPDIR.
+# Usage:
+#   VERIFY_RUN_ID=<id> bin/cli --cwd DIR --tmp DIR --name STEM -- <args>
+# Refuses --deep unless --dry-run is also present.
+# Refuses a --tmp that is not under this run's scratch tree.
+# Always exits 0; read exit.txt.
+
+set -euo pipefail
+
+# shellcheck source=_lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+
+verify_require_run_id
+
+cwd=""
+tmp=""
+name=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cwd)
+      cwd="${2:-}"
+      shift 2
+      ;;
+    --tmp)
+      tmp="${2:-}"
+      shift 2
+      ;;
+    --name)
+      name="${2:-}"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "verify-cli: unknown option: $1" >&2
+      echo "usage: verify-cli --cwd DIR --tmp DIR --name STEM -- <args>" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$cwd" || -z "$tmp" || -z "$name" ]]; then
+  echo "verify-cli: --cwd, --tmp, and --name are required" >&2
+  exit 2
+fi
+if [[ ! -d "$cwd" || ! -d "$tmp" ]]; then
+  echo "verify-cli: --cwd and --tmp must be directories" >&2
+  exit 2
+fi
+
+cwd="$(verify_realpath "$cwd")"
+tmp="$(verify_realpath "$tmp")"
+scratch="$(verify_realpath "$(verify_scratch_root)")"
+repo_root="$(verify_realpath "$REPO_ROOT")"
+
+case "$tmp" in
+  "$scratch" | "$scratch"/*) ;;
+  *)
+    echo "verify-cli: refusing TMPDIR outside this run's scratch ($tmp)" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$cwd" == "$repo_root" ]]; then
+  echo "verify-cli: refusing to drive in the package repo ($repo_root)" >&2
+  exit 2
+fi
+
+has_deep=0
+has_dry=0
+for arg in "$@"; do
+  case "$arg" in
+    --deep) has_deep=1 ;;
+    --dry-run) has_dry=1 ;;
+  esac
+done
+if [[ "$has_deep" -eq 1 && "$has_dry" -eq 0 ]]; then
+  echo "verify-cli: refusing --deep without --dry-run (would purge this machine's Xcode/Gradle caches)" >&2
+  exit 2
+fi
+
+evidence="$(verify_evidence_dir "$name")"
+printf '%s\n' "TMPDIR=$tmp PATH=/usr/bin:/bin $CLI_SH $*" >"$evidence/argv.txt"
+printf '%s\n' "$cwd" >"$evidence/cwd.txt"
+printf '%s\n' "$tmp" >"$evidence/tmpdir.txt"
+
+set +e
+(
+  cd "$cwd"
+  PATH="/usr/bin:/bin" TMPDIR="$tmp" NO_COLOR=1 "$CLI_SH" "$@"
+) >"$evidence/stdout.txt" 2>"$evidence/stderr.txt"
+code=$?
+set -e
+printf '%s\n' "$code" >"$evidence/exit.txt"
+
+echo "verify-cli name=$name exit=$code cwd=$cwd tmp=$tmp evidence=$evidence"
+exit 0

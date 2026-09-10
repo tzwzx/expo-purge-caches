@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=_lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+
+fail() {
+  echo "doctor FAIL: $*" >&2
+  exit 1
+}
+
+ok() {
+  echo "doctor ok: $*"
+}
+
+if [[ ! -x "$CLI_SH" ]]; then
+  fail "CLI missing or not executable at $CLI_SH"
+fi
+ok "CLI present at $CLI_SH"
+
+pkg_name="$(python3 -c "import json; print(json.load(open('$REPO_ROOT/package.json'))['name'])")"
+pkg_version="$(python3 -c "import json; print(json.load(open('$REPO_ROOT/package.json'))['version'])")"
+if [[ "$pkg_name" != "@tzwzx/expo-purge-caches" ]]; then
+  fail "expected @tzwzx/expo-purge-caches, found $pkg_name"
+fi
+ok "package $pkg_name@$pkg_version"
+
+help_out="$(mktemp)"
+set +e
+"$CLI_SH" --help >"$help_out"
+help_code=$?
+set -e
+[[ "$help_code" -eq 0 ]] || fail "--help exited $help_code"
+for needle in "Usage:" "--deep" "--dry-run" "-y, --yes" "--version" "-h, --help"; do
+  grep -F -q -- "$needle" "$help_out" || fail "help missing '$needle'"
+done
+rm -f "$help_out"
+ok "--help names --deep, --dry-run, --yes"
+
+ver="$("$CLI_SH" --version)"
+[[ "$ver" == "$pkg_version" ]] || fail "--version is $ver, package.json is $pkg_version"
+ok "--version matches package.json"
+
+echo "doctor PASS: $pkg_name@$pkg_version"
+echo "doctor note: never run without --dry-run unless TMPDIR and cwd are scratch from bin/project"
+echo "doctor note: bin/cli refuses --deep unless --dry-run is also present"

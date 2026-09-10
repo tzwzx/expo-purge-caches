@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Create a disposable fake Expo project and an isolated TMPDIR.
+# Usage: VERIFY_RUN_ID=<id> .cursor/skills/verify-expo-purge-caches/bin/project
+# Prints: <project-dir> <fake-tmpdir>
+
+set -euo pipefail
+
+# shellcheck source=_lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
+
+verify_require_run_id
+
+root="$(verify_scratch_root)"
+mkdir -p "$root"
+proj="$(mktemp -d "$root/proj-XXXXXX")"
+fake_tmp="$(mktemp -d "$root/tmp-XXXXXX")"
+
+printf '%s\n' '{"name":"verify-expo","dependencies":{"expo":"1.0.0"}}' >"$proj/package.json"
+mkdir -p "$proj/.expo" "$proj/.gradle" "$proj/node_modules/.cache"
+printf 'cache\n' >"$proj/.expo/keep"
+printf 'cache\n' >"$proj/node_modules/.cache/keep"
+mkdir -p "$fake_tmp/metro-cache" "$fake_tmp/haste-map-old" "$fake_tmp/bunx-501-eas-cli@latest" "$fake_tmp/unrelated-keep-me"
+: >"$fake_tmp/bunx-501-eas-cli@latest/bun.lock"
+
+echo "$proj" >>"$root/dirs.txt"
+printf '%s %s\n' "$proj" "$fake_tmp"
