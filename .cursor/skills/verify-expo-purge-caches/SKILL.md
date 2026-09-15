@@ -52,7 +52,7 @@ Read-only. Checks the script is executable, package name `@tzwzx/expo-purge-cach
 | Dry-run local | `--dry-run -y` | `[dry-run] would remove:` for `.expo` and fake metro/bunx; those paths still exist |
 | Live local | `-y` | `.expo` and fake `metro-cache` / `bunx-501-*` gone; `unrelated-keep-me` remains |
 | Tracked ios | git-tracked `ios/` then `-y` | warning `skipped ios/`; directory remains |
-| Deep dry-run | `--deep --dry-run -y` | would-remove lines for DerivedData / Gradle; those real paths still exist |
+| Deep dry-run | `--deep --dry-run -y` | `would remove:` and `DerivedData` if that path exists (section headers still print if it does not); those real paths still exist |
 
 `bin/cli` refuses (exit 2, no spawn):
 
